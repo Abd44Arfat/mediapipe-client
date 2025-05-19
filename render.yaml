@@ -7,5 +7,4 @@ services:
     envVars:
       - key: PORT
         value: "10000"
-    staticPublishPath: static
     plan: free
