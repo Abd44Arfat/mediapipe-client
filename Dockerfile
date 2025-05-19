@@ -1,6 +1,6 @@
 FROM python:3.12
 
-# تثبيت الأدوات اللازمة لبناء الحزم
+# تثبيت أدوات البناء والمكتبات الأساسية
 RUN apt-get update && apt-get install -y \
     build-essential \
     python3-dev \
@@ -15,15 +15,13 @@ RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     && apt-get clean
 
-# إعداد مجلد العمل
+# ترقية pip وتثبيت setuptools و wheel
+RUN pip install --upgrade pip setuptools wheel
+
 WORKDIR /app
 
-# نسخ ملفات المشروع
 COPY . .
 
-# ترقية pip وتثبيت المتطلبات
-RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
-# تشغيل التطبيق
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
