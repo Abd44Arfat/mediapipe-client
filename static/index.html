@@ -7,18 +7,44 @@
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
   <style>
-    video, canvas { 
-      position: absolute; 
-      width: 320px; height: 240px;
+    body {
+      margin: 0;
+      background-color: #f0f0f0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #container {
+      position: relative;
+      width: 640px;
+      height: 480px;
+    }
+
+    video, canvas {
+      position: absolute;
+      width: 640px;
+      height: 480px;
+      border-radius: 12px;
+    }
+
+    #prediction {
+      margin-top: 20px;
+      font-size: 24px;
+      color: blue;
+      font-family: Arial, sans-serif;
     }
   </style>
 </head>
 <body>
-  <video id="input_video" autoplay muted></video>
-  <canvas id="output_canvas"></canvas>
-  <div id="prediction" style="position: absolute; top: 260px; left: 10px; font-size: 24px; color: blue;">
-    Loading prediction...
+  <div id="container">
+    <video id="input_video" autoplay muted></video>
+    <canvas id="output_canvas"></canvas>
   </div>
+  <div id="prediction">Loading prediction...</div>
 
   <script>
     const videoElement = document.getElementById('input_video');
@@ -31,23 +57,23 @@
     ws.onmessage = e => {
       console.log('Message from server:', e.data);
       const data = JSON.parse(e.data);
-      if (data.action) {
-        document.getElementById('prediction').textContent = "Prediction: " + data.action;
+      if (data.sentence) {
+        document.getElementById('prediction').textContent = "Prediction Sentence: " + data.sentence.join(' ');
       }
     };
 
     function onResults(results) {
       canvasCtx.save();
       canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-
       canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
       if (results.multiHandLandmarks) {
         for (const landmarks of results.multiHandLandmarks) {
-          window.drawConnectors(canvasCtx, landmarks, window.HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 2});
-          window.drawLandmarks(canvasCtx, landmarks, {color: '#FF0000', lineWidth: 1});
+          window.drawConnectors(canvasCtx, landmarks, window.HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 1}); // Reduced from 2 to 1
+          window.drawLandmarks(canvasCtx, landmarks, {color: '#FF0000', radius: 2}); // Added radius: 2 for smaller dots
         }
       }
+
       canvasCtx.restore();
 
       let keypoints = [];
@@ -85,16 +111,11 @@
       onFrame: async () => {
         await hands.send({image: videoElement});
       },
-      width: 320,
-      height: 240
+      width: 640,
+      height: 480
     });
 
     camera.start();
-
-    videoElement.width = 320;
-    videoElement.height = 500;
-    canvasElement.width = 320;
-    canvasElement.height = 240;
   </script>
 </body>
 </html>
