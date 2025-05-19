@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>MediaPipe Hands + WebSocket</title>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <style>
+    video, canvas { 
+      position: absolute; 
+      width: 320px; height: 240px;
+    }
+  </style>
+</head>
+<body>
+  <video id="input_video" autoplay muted></video>
+  <canvas id="output_canvas"></canvas>
+  <div id="prediction" style="position: absolute; top: 260px; left: 10px; font-size: 24px; color: blue;">
+    Loading prediction...
+  </div>
+
+  <script>
+    const videoElement = document.getElementById('input_video');
+    const canvasElement = document.getElementById('output_canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+
+    const ws = new WebSocket('ws://192.168.1.5:8000/ws/predict');
+    ws.onopen = () => console.log('WebSocket connected');
+    ws.onerror = e => console.error('WebSocket error:', e);
+    ws.onmessage = e => {
+      console.log('Message from server:', e.data);
+      const data = JSON.parse(e.data);
+      if (data.action) {
+        document.getElementById('prediction').textContent = "Prediction: " + data.action;
+      }
+    };
+
+    function onResults(results) {
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+      canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+      if (results.multiHandLandmarks) {
+        for (const landmarks of results.multiHandLandmarks) {
+          window.drawConnectors(canvasCtx, landmarks, window.HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 2});
+          window.drawLandmarks(canvasCtx, landmarks, {color: '#FF0000', lineWidth: 1});
+        }
+      }
+      canvasCtx.restore();
+
+      let keypoints = [];
+      if (results.multiHandLandmarks) {
+        results.multiHandLandmarks.forEach(hand => {
+          hand.forEach(landmark => {
+            keypoints.push(landmark.x);
+            keypoints.push(landmark.y);
+            keypoints.push(landmark.z);
+          });
+        });
+      } else {
+        keypoints = new Array(21 * 3 * 2).fill(0);
+      }
+
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ keypoints }));
+      }
+    }
+
+    const hands = new Hands({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
+
+    hands.setOptions({
+      maxNumHands: 2,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.7,
+      minTrackingConfidence: 0.5
+    });
+
+    hands.onResults(onResults);
+
+    const camera = new Camera(videoElement, {
+      onFrame: async () => {
+        await hands.send({image: videoElement});
+      },
+      width: 320,
+      height: 240
+    });
+
+    camera.start();
+
+    videoElement.width = 320;
+    videoElement.height = 500;
+    canvasElement.width = 320;
+    canvasElement.height = 240;
+  </script>
+</body>
+</html>
