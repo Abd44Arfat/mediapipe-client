@@ -20,7 +20,7 @@ actions = ["nice", "thankyou", "meet", "fine", "how", "what", "cool", "name", "h
 
 @app.websocket("/ws/predict")
 async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()ش
+    await websocket.accept()
     sequence = []
     sentence = []
     predictions = []
