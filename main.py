@@ -4,11 +4,8 @@ import tensorflow as tf
 import uvicorn
 from fastapi.staticfiles import StaticFiles
 
-
 app = FastAPI()
-
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
 
 # Load LSTM model
 model = tf.keras.models.load_model("LSTM_model.h5")
@@ -24,6 +21,7 @@ async def websocket_endpoint(websocket: WebSocket):
     sequence = []
     sentence = []
     predictions = []
+    idle_count = 0
 
     while True:
         try:
@@ -35,7 +33,6 @@ async def websocket_endpoint(websocket: WebSocket):
 
             keypoints = np.array(data["keypoints"])
 
-            # تأكد ان ال keypoints بالشكل الصحيح
             if keypoints.shape[0] != KEYPOINTS_DIM:
                 await websocket.send_json({"error": f"keypoints length must be {KEYPOINTS_DIM}"})
                 continue
@@ -45,24 +42,36 @@ async def websocket_endpoint(websocket: WebSocket):
 
             if len(sequence) == SEQUENCE_LENGTH:
                 input_seq = np.expand_dims(np.array(sequence), axis=0)
-                res = model.predict(input_seq)[0]
+                res = model.predict(input_seq, verbose=0)[0]
                 predicted_index = int(np.argmax(res))
                 confidence = float(np.max(res))
                 action = actions[predicted_index]
                 predictions.append(predicted_index)
 
-                # شرط الثبات على نفس التوقع لزيادة الثقة
-                if len(predictions) >= 15 and np.unique(predictions[-15:])[0] == predicted_index:
+                if confidence < 0.5:
+                    idle_count += 1
+                else:
+                    idle_count = 0
+
+                if idle_count > 20:
+                    sentence = []
+                    predictions = []
+                    idle_count = 0
+
+                if len(predictions) >= 15 and predictions[-15:].count(predicted_index) > 12:
                     if confidence > 0.8:
                         if len(sentence) == 0 or action != sentence[-1]:
                             sentence.append(action)
-                            sentence = sentence[-5:]
+                            sentence = sentence[-7:]
+
+                readable_sentence = " ".join(sentence)
 
                 await websocket.send_json({
                     "predicted_index": predicted_index,
                     "action": action,
                     "confidence": confidence,
-                    "sentence": sentence
+                    "sentence": sentence,
+                    "readable_sentence": readable_sentence
                 })
 
         except Exception as e:
