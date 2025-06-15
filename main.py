@@ -1,10 +1,13 @@
 from fastapi import FastAPI, WebSocket
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, HTMLResponse 
 import numpy as np
 import tensorflow as tf
 import uvicorn
-from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
+
+# Mount static directory
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Load LSTM model
@@ -14,6 +17,14 @@ model = tf.keras.models.load_model("LSTM_model.h5")
 SEQUENCE_LENGTH = 30
 KEYPOINTS_DIM = 126
 actions = ["nice", "thankyou", "meet", "fine", "how", "what", "cool", "name", "hello", "you", "me", "your"]
+
+# endpoint to Serve index.html
+@app.get("/ai", response_class=HTMLResponse)
+async def read_ai_interface():
+    """
+    Serves the main AI interface page (index.html).
+    """
+    return FileResponse("static/index.html")
 
 @app.websocket("/ws/predict")
 async def websocket_endpoint(websocket: WebSocket):
@@ -78,4 +89,4 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.send_json({"error": str(e)})
 
 if __name__ == "__main__":
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
